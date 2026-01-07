@@ -77,16 +77,19 @@ class AutoMode:
             # Шаг 1: Мониторинг Telegram-каналов
             if cfg.telegram.source_channels:
                 logger.info(
-                    f"Мониторинг {len(cfg.telegram.source_channels)} Telegram-каналов..."
+                    f"Мониторинг {len(cfg.telegram.source_channels)} Telegram-каналов "
+                    f"(с фильтрацией по модели вкуса)..."
                 )
                 copied = await monitor_telegram_channels(
                     source_channels=cfg.telegram.source_channels,
                     target_channel=cfg.telegram.channel_username,
                     schedule_delay_hours=1,
                     limit_per_channel=10,
+                    use_taste_model=True,
+                    taste_threshold=self.taste_threshold,
                 )
                 total_copied += copied
-                logger.info(f"Скопировано {copied} постов из Telegram-каналов")
+                logger.info(f"Скопировано {copied} мемов из Telegram-каналов (после фильтрации)")
 
             # Шаг 2: Поиск мемов с Reddit
             logger.info(f"Поиск мемов с Reddit (лимит: {self.posts_per_search})...")
