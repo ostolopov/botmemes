@@ -14,6 +14,7 @@ from telegram_export import main as export_telegram_main
 from embeddings import build_faiss_index
 from sources_reddit import fetch_and_match_reddit_memes
 from scheduler import post_candidates_to_channel
+from auto_mode import AutoMode
 
 
 def main() -> None:

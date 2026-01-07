@@ -134,13 +134,27 @@ def post_candidates_to_channel(
         interval_hours: Интервал между постами в часах (по умолчанию 1 час)
         start_delay_minutes: Задержка перед отправкой первого поста в минутах
     """
-    asyncio.run(
-        _post_candidates_async(
-            max_count=max_count,
-            interval_hours=interval_hours,
-            start_delay_minutes=start_delay_minutes,
+    try:
+        # Проверяем, запущен ли event loop
+        asyncio.get_running_loop()
+        # Если loop запущен, нельзя использовать asyncio.run()
+        # В этом случае нужно вызывать _post_candidates_async напрямую через await
+        raise RuntimeError(
+            "post_candidates_to_channel() вызвана из async контекста. "
+            "Используйте await _post_candidates_async() напрямую."
         )
-    )
+    except RuntimeError as e:
+        if "get_running_loop" in str(e):
+            # Event loop не запущен, используем asyncio.run()
+            asyncio.run(
+                _post_candidates_async(
+                    max_count=max_count,
+                    interval_hours=interval_hours,
+                    start_delay_minutes=start_delay_minutes,
+                )
+            )
+        else:
+            raise
 
 
 if __name__ == "__main__":

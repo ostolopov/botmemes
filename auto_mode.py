@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from config import load_app_config
-from scheduler import post_candidates_to_channel
+from scheduler import _post_candidates_async
 from sources_reddit import fetch_and_match_reddit_memes
 
 # Настройка логирования
@@ -90,7 +90,8 @@ class AutoMode:
                 f"(интервал: {self.schedule_interval_hours} ч, "
                 f"задержка: {self.schedule_delay_minutes} мин)..."
             )
-            post_candidates_to_channel(
+            # Используем асинхронную функцию напрямую, так как мы уже в async контексте
+            await _post_candidates_async(
                 max_count=self.posts_to_schedule,
                 interval_hours=self.schedule_interval_hours,
                 start_delay_minutes=self.schedule_delay_minutes,
