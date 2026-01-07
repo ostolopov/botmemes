@@ -35,3 +35,7 @@ __pycache__/
 # Логи автономного режима
 auto_mode.log
 
+# История отправленных мемов
+data/sent_memes.json
+data/processed_messages.json
+

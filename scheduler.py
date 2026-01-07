@@ -14,6 +14,7 @@ from typing import List
 from telethon import TelegramClient
 
 from config import load_app_config
+from sent_tracker import filter_sent_memes, add_sent_meme, is_meme_sent
 
 # Файл кандидатов из Reddit
 REDDIT_CANDIDATES_FILE = Path("data/reddit_candidates.json")
@@ -60,8 +61,14 @@ async def _post_candidates_async(
     if not candidates:
         return
 
+    # Фильтруем уже отправленные мемы
+    candidates = filter_sent_memes(candidates)
+    if not candidates:
+        print("Все мемы уже были отправлены. Нужно найти новые мемы.")
+        return
+
     to_send = candidates[:max_count]
-    print(f"Будет отправлено {len(to_send)} мемов в отложку")
+    print(f"Будет отправлено {len(to_send)} мемов в отложку (после фильтрации дубликатов)")
 
     client = TelegramClient(
         "session_scheduler",
@@ -93,7 +100,12 @@ async def _post_candidates_async(
                 )
 
             image_url = cand["image_url"]
-            meme_id = cand.get("reddit_id", "unknown")
+            meme_id = cand.get("reddit_id") or cand.get("image_url", "unknown")
+            
+            # Проверяем, не был ли мем уже отправлен (дополнительная проверка)
+            if is_meme_sent(meme_id):
+                print(f"[{idx}/{len(to_send)}] Мем {meme_id} уже был отправлен, пропускаю")
+                continue
             
             try:
                 # Отправляем в отложку
@@ -107,6 +119,9 @@ async def _post_candidates_async(
                     f"[{idx}/{len(to_send)}] Мем {meme_id} запланирован на "
                     f"{schedule_time.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
+                
+                # Сохраняем ID отправленного мема
+                add_sent_meme(meme_id)
                 
                 # Увеличиваем время для следующего поста
                 schedule_time += interval

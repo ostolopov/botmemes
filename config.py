@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from typing import List
 
 from dotenv import load_dotenv
 
@@ -12,6 +13,7 @@ class TelegramConfig:
     api_id: int
     api_hash: str
     channel_username: str
+    source_channels: List[str]  # Список каналов для мониторинга
 
 
 @dataclass
@@ -39,10 +41,34 @@ class AppConfig:
 
 
 def load_telegram_config() -> TelegramConfig:
+    # Парсим список каналов из переменной окружения (через запятую)
+    source_channels_str = os.environ.get("SOURCE_TELEGRAM_CHANNELS", "")
+    source_channels = [
+        ch.strip() for ch in source_channels_str.split(",") if ch.strip()
+    ]
+    
+    # Если список пуст, используем дефолтные каналы
+    if not source_channels:
+        source_channels = [
+            "@why4ch",
+            "@beobanka",
+            "@saved_2_0",
+            "@profunctor_io",
+            "@subject282",
+            "@poieajpoij",
+            "@takoi_sebe_channel",
+            "@reptilememe",
+            "@aftertitles",
+            "@Katzen_und_Politik",
+            "@transhumemism",
+            "@bogmoegopadika",
+        ]
+    
     return TelegramConfig(
         api_id=int(os.environ["TELEGRAM_API_ID"]),
         api_hash=os.environ["TELEGRAM_API_HASH"],
         channel_username=os.environ.get("TELEGRAM_CHANNEL_USERNAME", ""),
+        source_channels=source_channels,
     )
 
 

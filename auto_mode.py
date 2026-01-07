@@ -14,6 +14,7 @@ from pathlib import Path
 from config import load_app_config
 from scheduler import _post_candidates_async
 from sources_reddit import fetch_and_match_reddit_memes
+from telegram_monitor import monitor_telegram_channels
 
 # Настройка логирования
 logging.basicConfig(
@@ -63,14 +64,31 @@ class AutoMode:
 
     async def run_cycle(self) -> None:
         """
-        Один цикл работы: поиск мемов и отправка в отложку.
+        Один цикл работы: мониторинг каналов, поиск мемов и отправка в отложку.
         """
         try:
             logger.info("=" * 60)
             logger.info("Начало цикла поиска и отправки мемов")
             logger.info(f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-            # Шаг 1: Поиск мемов с Reddit
+            cfg = load_app_config()
+            total_copied = 0
+
+            # Шаг 1: Мониторинг Telegram-каналов
+            if cfg.telegram.source_channels:
+                logger.info(
+                    f"Мониторинг {len(cfg.telegram.source_channels)} Telegram-каналов..."
+                )
+                copied = await monitor_telegram_channels(
+                    source_channels=cfg.telegram.source_channels,
+                    target_channel=cfg.telegram.channel_username,
+                    schedule_delay_hours=1,
+                    limit_per_channel=10,
+                )
+                total_copied += copied
+                logger.info(f"Скопировано {copied} постов из Telegram-каналов")
+
+            # Шаг 2: Поиск мемов с Reddit
             logger.info(f"Поиск мемов с Reddit (лимит: {self.posts_per_search})...")
             candidates = fetch_and_match_reddit_memes(
                 limit=self.posts_per_search,
@@ -79,25 +97,34 @@ class AutoMode:
             )
 
             if not candidates:
-                logger.warning("Не найдено подходящих мемов. Пропускаю отправку.")
-                return
+                logger.warning("Не найдено подходящих мемов с Reddit.")
+            else:
+                # Фильтруем уже отправленные мемы
+                from sent_tracker import filter_sent_memes
+                
+                candidates = filter_sent_memes(candidates)
+                if not candidates:
+                    logger.warning("Все найденные мемы уже были отправлены.")
+                else:
+                    logger.info(
+                        f"Найдено {len(candidates)} новых подходящих мемов "
+                        f"(после фильтрации дубликатов)"
+                    )
 
-            logger.info(f"Найдено {len(candidates)} подходящих мемов")
+                    # Шаг 3: Отправка в отложку
+                    logger.info(
+                        f"Отправка {self.posts_to_schedule} мемов в отложку "
+                        f"(интервал: {self.schedule_interval_hours} ч, "
+                        f"задержка: {self.schedule_delay_minutes} мин)..."
+                    )
+                    # Используем асинхронную функцию напрямую, так как мы уже в async контексте
+                    await _post_candidates_async(
+                        max_count=self.posts_to_schedule,
+                        interval_hours=self.schedule_interval_hours,
+                        start_delay_minutes=self.schedule_delay_minutes,
+                    )
 
-            # Шаг 2: Отправка в отложку
-            logger.info(
-                f"Отправка {self.posts_to_schedule} мемов в отложку "
-                f"(интервал: {self.schedule_interval_hours} ч, "
-                f"задержка: {self.schedule_delay_minutes} мин)..."
-            )
-            # Используем асинхронную функцию напрямую, так как мы уже в async контексте
-            await _post_candidates_async(
-                max_count=self.posts_to_schedule,
-                interval_hours=self.schedule_interval_hours,
-                start_delay_minutes=self.schedule_delay_minutes,
-            )
-
-            logger.info("✓ Цикл завершён успешно")
+            logger.info(f"✓ Цикл завершён успешно. Всего обработано: {total_copied} постов")
             logger.info("=" * 60)
 
         except Exception as exc:  # noqa: BLE001
